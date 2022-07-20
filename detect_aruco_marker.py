@@ -1,6 +1,8 @@
 # import the OpenCV library for computer vision
-import cv2
+import cv2, time
 import numpy as np
+from pymavlink import mavutil
+from pyquaternion import Quaternion
 
 cv2.namedWindow('image_display', cv2.WINDOW_AUTOSIZE)
 
@@ -13,6 +15,9 @@ parameters = cv2.aruco.DetectorParameters_create()
 
 # initialize the webcam as "camera" object
 camera = cv2.VideoCapture("rtsp://192.168.0.34:8554/unicast")
+
+master = mavutil.mavlink_connection(device="udpout:192.168.0.34:17500", source_system=255)
+last_send_ts = time.time()
 
 # loop that runs the program forever
 # at least until the "q" key is pressed
@@ -27,20 +32,26 @@ while True:
         # detect aruco tags within the frame
         markerCorners, markerIds, rejectedCandidates = cv2.aruco.detectMarkers(gray, dictionary, parameters=parameters)
 
-        rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, np.array([[978.05583, 0, 644.3227087], [0, 980.40099676, 377.5166175], [0, 0, 1]]), 
-        np.array([0.1542403792, -0.207237266, 0.00062078491848, 0.00089082489, -0.2166006565]))
-
         # draw box around aruco marker within camera frame
         img = cv2.aruco.drawDetectedMarkers(img, markerCorners, markerIds)
 
         # if a tag is found...
         if markerIds is not None:
-            # for every tag in the array of detected tags...
-            for i in range(len(markerIds)):
+            now_ts = time.time()
+            if now_ts - last_send_ts > 0.1:
+                last_send_ts = now_ts
+
+                rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, np.array([[978.05583, 0, 644.3227087], [0, 980.40099676, 377.5166175], [0, 0, 1]]), np.array([0.1542403792, -0.207237266, 0.00062078491848, 0.00089082489, -0.2166006565]))
+
                 r_mtx = cv2.Rodrigues(rvecs[0][0])
                 r_mtx = r_mtx[0].transpose()
-                print(markerIds[0], np.matmul(r_mtx, np.negative(tvecs[0][0])))
+                pos = np.matmul(r_mtx, np.negative(tvecs[0][0]))
+                r_quat = Quaternion(matrix=r_mtx)
+                master.mav.att_pos_mocap_send(int(now_ts*1000000), (r_quat.w, r_quat.x, r_quat.z, -r_quat.y), pos[0], pos[2], -pos[1])
+                #print(markerIds[0], pos)
 
+            # for every tag in the array of detected tags...
+            #for i in range(len(markerIds)):
                 # get the center point of the tag
                 #center = markerCorners[i][0]
                 #M = cv2.moments(center)
@@ -70,6 +81,11 @@ while True:
     if cv2.waitKey(10) & 0xff == 113 :
         print("bye")
         break
+    
+    msg = master.recv_msg()
+    if msg is not None:
+        if msg.get_type() == "STATUSTEXT":
+            print ("[", msg.get_srcSystem(),"]", msg.text)
 
 # When everything done, release the capture
 camera.release()
