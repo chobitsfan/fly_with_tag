@@ -27,7 +27,7 @@ while True:
         # detect aruco tags within the frame
         markerCorners, markerIds, rejectedCandidates = cv2.aruco.detectMarkers(gray, dictionary, parameters=parameters)
 
-        rvec , tvec, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, np.array([[978.05583, 0, 644.3227087], [0, 980.40099676, 377.5166175], [0, 0, 1]]), 
+        rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, np.array([[978.05583, 0, 644.3227087], [0, 980.40099676, 377.5166175], [0, 0, 1]]), 
         np.array([0.1542403792, -0.207237266, 0.00062078491848, 0.00089082489, -0.2166006565]))
 
         # draw box around aruco marker within camera frame
@@ -37,45 +37,37 @@ while True:
         if markerIds is not None:
             # for every tag in the array of detected tags...
             for i in range(len(markerIds)):
+                r_mtx = cv2.Rodrigues(rvecs[0][0])
+                r_mtx = r_mtx[0].transpose()
+                print(markerIds[0], np.matmul(r_mtx, np.negative(tvecs[0][0])))
 
-                print(markerIds[0], tvec)
-                if 1 in markerIds:
-                    cv2.putText(img, "Tag 1 Detected!", (25, 400), cv2.FONT_HERSHEY_COMPLEX, 0.7,
-                                (0, 255, 0), 2)
-                if 2 in markerIds:
-                    cv2.putText(img, "Tag 2 Detected!", (25, 425), cv2.FONT_HERSHEY_COMPLEX, 0.7,
-                                (0, 255, 0), 2)
-                if 1 in markerIds and 2 in markerIds:
-                    cv2.putText(img, "Tag 1 AND 2 Detected!", (25, 450), cv2.FONT_HERSHEY_COMPLEX, 0.7,
-                                (0, 255, 0), 2)
                 # get the center point of the tag
-                center = markerCorners[i][0]
-                M = cv2.moments(center)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
+                #center = markerCorners[i][0]
+                #M = cv2.moments(center)
+                #cX = int(M["m10"] / M["m00"])
+                #cY = int(M["m01"] / M["m00"])
                 # draws a red dot on the marker center
-                cv2.circle(img, (cX, cY), 1, (0, 0, 255), 8)
+                #cv2.circle(img, (cX, cY), 1, (0, 0, 255), 8)
                 # writes the coordinates of the center of the tag
-                cv2.putText(img, str(cX) + "," + str(cY), (cX + 40, cY - 40), cv2.FONT_HERSHEY_COMPLEX, 0.7,
-                            (0, 255, 0), 2)
-                (topLeft, topRight, bottomRight, bottomLeft) = markerCorners[i][0]
+                #cv2.putText(img, str(cX) + "," + str(cY), (cX + 40, cY - 40), cv2.FONT_HERSHEY_COMPLEX, 0.7, (0, 255, 0), 2)
+                #(topLeft, topRight, bottomRight, bottomLeft) = markerCorners[i][0]
                 # convert each of the (x, y)-coordinate pairs to integers
-                topRight = (int(topRight[0]), int(topRight[1]))
-                bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
-                bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
-                topLeft = (int(topLeft[0]), int(topLeft[1]))
+                #topRight = (int(topRight[0]), int(topRight[1]))
+                #bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
+                #bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
+                #topLeft = (int(topLeft[0]), int(topLeft[1]))
 
                 # draw the bounding box of the ArUCo detection
-                cv2.line(img, topLeft, topRight, (0, 255, 0), 2)
-                cv2.line(img, topRight, bottomRight, (0, 255, 0), 2)
-                cv2.line(img, bottomRight, bottomLeft, (0, 255, 0), 2)
-                cv2.line(img, bottomLeft, topLeft, (0, 255, 0), 2)
+                #cv2.line(img, topLeft, topRight, (0, 255, 0), 2)
+                #cv2.line(img, topRight, bottomRight, (0, 255, 0), 2)
+                #cv2.line(img, bottomRight, bottomLeft, (0, 255, 0), 2)
+                #cv2.line(img, bottomLeft, topLeft, (0, 255, 0), 2)
 
         # Display the resulting frame
         cv2.imshow('image_display', img)
 
     # handler to press the "q" key to exit the program
-    if cv2.waitKey(10) & 0xff == 97 :
+    if cv2.waitKey(10) & 0xff == 113 :
         print("bye")
         break
 
