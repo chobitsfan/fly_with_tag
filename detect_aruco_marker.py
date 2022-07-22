@@ -13,10 +13,14 @@ dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
 # Initialize the detector parameters using default values
 parameters = cv2.aruco.DetectorParameters_create()
 
+drone_ip='192.168.0.215'
 # initialize the webcam as "camera" object
-camera = cv2.VideoCapture("rtsp://192.168.0.34:8554/unicast")
+#camera = cv2.VideoCapture("rtsp://192.168.0.34:8554/unicast")
+camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=0 ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+#print(camera.get(cv2.CAP_PROP_BUFFERSIZE))
+#camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-master = mavutil.mavlink_connection(device="udpout:192.168.0.34:17500", source_system=255)
+master = mavutil.mavlink_connection(device='udpout:'+drone_ip+':17500', source_system=255)
 last_send_ts = time.time()
 
 # loop that runs the program forever
@@ -84,8 +88,12 @@ while True:
     
     msg = master.recv_msg()
     if msg is not None:
-        if msg.get_type() == "STATUSTEXT":
+        msg_type = msg.get_type()
+        if msg_type == "STATUSTEXT":
             print ("[", msg.get_srcSystem(),"]", msg.text)
+        elif msg_type == "TIMESYNC":
+            if msg.tc1 == 0: # ardupilot send a timesync message every 10 seconds
+                master.mav.system_time_send(int(time.time() * 1000000), 0) # ardupilot ignore time_boot_ms
 
 # When everything done, release the capture
 camera.release()
