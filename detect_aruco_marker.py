@@ -32,6 +32,7 @@ drone_ip='192.168.0.34'
 camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=0 ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 #print(camera.get(cv2.CAP_PROP_BUFFERSIZE))
 #camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+rec_vid = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (1280,720))
 
 master = mavutil.mavlink_connection(device='udpout:'+drone_ip+':17500', source_system=255)
 last_send_ts = time.time()
@@ -62,7 +63,7 @@ while True:
         # if a tag is found...
         if markerIds is not None:
             now_ts = time.time()
-            if now_ts - last_send_ts > 0.1:
+            if now_ts - last_send_ts > 0.03:
                 rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
                 #cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
 
@@ -77,6 +78,8 @@ while True:
                 master.mav.att_pos_mocap_send(int(now_ts*1000000), (r_quat.w, r_quat.x, -r_quat.z, r_quat.y), pos[0], -pos[2], pos[1])
                 last_send_ts = now_ts
                 #print(markerIds[0], pos)
+
+                cv2.putText(img, ', '.join(map("{:0.2f}".format, pos)), (1, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1)
             #else:
             #    rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
             #    cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
@@ -108,6 +111,8 @@ while True:
         # Display the resulting frame
         cv2.imshow('image_display', img)
 
+        rec_vid.write(img)
+
     # handler to press the "q" key to exit the program
     usr_key = cv2.waitKey(1)
     if  usr_key & 0xff == 113:
@@ -132,4 +137,5 @@ while True:
 
 # When everything done, release the capture
 camera.release()
+rec_vid.release()
 cv2.destroyAllWindows()
