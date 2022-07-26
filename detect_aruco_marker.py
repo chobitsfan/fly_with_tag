@@ -41,7 +41,7 @@ got_attitude = False
 #distCoeffs = np.array([0.1542403792, -0.207237266, 0.00062078491848, 0.00089082489, -0.2166006565])
 camMat = np.array([[9.7805583154190560e+02, 0, 6.4432270873931213e+02], [0, 9.8040099676993566e+02, 3.7751661754419627e+02], [0, 0, 1]])
 distCoeffs = np.array([1.5424037927595446e-01, -2.0723726675535267e-01, 6.2078491848616114e-04, 8.9082489283745796e-04, -2.1660065658513647e-01])
-rot_y = np.array([[0,0,-1],[0,1,0],[1,0,0]]) #camera x axis to right, drone x axis to forward
+rot_y = np.array([[0,0,1],[0,1,0],[-1,0,0]]) #camera x axis to right, drone x axis to forward
 
 # loop that runs the program forever
 # at least until the "q" key is pressed
@@ -66,12 +66,14 @@ while True:
                 rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
                 #cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
 
-                r_mtx = cv2.Rodrigues(rvecs[0][0])
+                r_mtx = cv2.Rodrigues(rvecs[0][0])[0]
                 #print(rotationMatrixToEulerAngles(r_mtx[0]))
                 #print(r_mtx[0])
-                r_mtx = r_mtx[0].transpose()
+                heading_r_mtx = np.matmul(rot_y, r_mtx)
+                heading_r_mtx = heading_r_mtx.transpose()
+                r_mtx = r_mtx.transpose()
                 pos = np.matmul(r_mtx, np.negative(tvecs[0][0]))
-                r_quat = Quaternion(matrix=np.matmul(rot_y, r_mtx))
+                r_quat = Quaternion(matrix=heading_r_mtx)
                 master.mav.att_pos_mocap_send(int(now_ts*1000000), (r_quat.w, r_quat.x, -r_quat.z, r_quat.y), pos[0], -pos[2], pos[1])
                 last_send_ts = now_ts
                 #print(markerIds[0], pos)
@@ -122,12 +124,11 @@ while True:
         elif msg_type == "TIMESYNC":
             if msg.tc1 == 0: # ardupilot send a timesync message every 10 seconds
                 master.mav.system_time_send(int(time.time() * 1000000), 0) # ardupilot ignore time_boot_ms
-        elif msg_type == "HEARTBEAT":
-            if not got_attitude:
-                master.mav.command_long_send(0, 0, 511, 0, 30, 2000000, 0, 0, 0, 0, 0)
-        elif msg_type == "ATTITUDE":
+        #elif msg_type == "HEARTBEAT":
+            #if not got_attitude:
+                #master.mav.command_long_send(0, 0, 511, 0, 30, 2000000, 0, 0, 0, 0, 0)
+        #elif msg_type == "ATTITUDE":
             #print('heading', msg.yaw*180/math.pi)
-            pass
 
 # When everything done, release the capture
 camera.release()
