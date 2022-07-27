@@ -26,7 +26,7 @@ dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
 # Initialize the detector parameters using default values
 parameters = cv2.aruco.DetectorParameters_create()
 
-drone_ip='192.168.0.34'
+drone_ip='192.168.0.33'
 # initialize the webcam as "camera" object
 #camera = cv2.VideoCapture("rtsp://192.168.0.34:8554/unicast")
 camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=0 ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
@@ -65,7 +65,7 @@ while True:
             now_ts = time.time()
             if now_ts - last_send_ts > 0.03:
                 rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
-                #cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
+                cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
 
                 r_mtx = cv2.Rodrigues(rvecs[0][0])[0]
                 #print(rotationMatrixToEulerAngles(r_mtx[0]))
@@ -79,7 +79,7 @@ while True:
                 last_send_ts = now_ts
                 #print(markerIds[0], pos)
 
-                cv2.putText(img, ', '.join(map("{:0.2f}".format, pos)), (1, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 1)
+                cv2.putText(img, ', '.join(map("{:0.2f}".format, pos)), (1, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 200), 2)
             #else:
             #    rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
             #    cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
