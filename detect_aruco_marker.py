@@ -32,10 +32,10 @@ at_detector = Detector(families='tag36h11', nthreads=2, quad_decimate=2.0, quad_
 drone_ip='192.168.0.36'
 # initialize the webcam as "camera" object
 #camera = cv2.VideoCapture("rtsp://192.168.0.34:8554/unicast")
-camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=100 ! queue ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=0 ! queue ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 #print(camera.get(cv2.CAP_PROP_BUFFERSIZE))
 #camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-#rec_vid = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (1280,720))
+rec_vid = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (1280,720))
 
 master = mavutil.mavlink_connection(device='udpout:'+drone_ip+':17500', source_system=255)
 last_send_ts = time.time()
@@ -144,7 +144,7 @@ while True:
         # Display the resulting frame
         cv2.imshow('image_display', img)
 
-        #rec_vid.write(img)
+        rec_vid.write(img)
 
     # handler to press the "q" key to exit the program
     usr_key = cv2.waitKey(1)
@@ -171,5 +171,5 @@ while True:
 
 # When everything done, release the capture
 camera.release()
-#rec_vid.release()
+rec_vid.release()
 cv2.destroyAllWindows()

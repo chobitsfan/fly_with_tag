@@ -14,7 +14,7 @@ while True:
 
     if ret:
         cv2.imshow('image_display', image)
-        key = cv2.waitKey(1)
+        key = cv2.waitKey(10)
         if key == 113: #q
             break
     else:
