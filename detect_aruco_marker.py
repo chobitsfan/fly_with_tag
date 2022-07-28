@@ -3,6 +3,7 @@ import cv2, time, math
 import numpy as np
 from pymavlink import mavutil
 from pyquaternion import Quaternion
+from dt_apriltags import Detector
 
 def rotationMatrixToEulerAngles(R) :
     sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
@@ -21,18 +22,20 @@ cv2.namedWindow('image_display', cv2.WINDOW_AUTOSIZE)
 
 # Load the dictionary that was used to generate the markers.
 # There's different aruco marker dictionaries, this code uses 6x6
-dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
+#dictionary = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_250)
 
 # Initialize the detector parameters using default values
-parameters = cv2.aruco.DetectorParameters_create()
+#parameters = cv2.aruco.DetectorParameters_create()
 
-drone_ip='192.168.0.33'
+at_detector = Detector(families='tag36h11', nthreads=2, quad_decimate=2.0, quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
+
+drone_ip='192.168.0.36'
 # initialize the webcam as "camera" object
 #camera = cv2.VideoCapture("rtsp://192.168.0.34:8554/unicast")
-camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=0 ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
+camera = cv2.VideoCapture('rtspsrc location=rtsp://'+drone_ip+':8554/unicast latency=100 ! queue ! rtph264depay ! h264parse ! avdec_h264 ! videoconvert ! appsink', cv2.CAP_GSTREAMER)
 #print(camera.get(cv2.CAP_PROP_BUFFERSIZE))
 #camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-rec_vid = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (1280,720))
+#rec_vid = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (1280,720))
 
 master = mavutil.mavlink_connection(device='udpout:'+drone_ip+':17500', source_system=255)
 last_send_ts = time.time()
@@ -47,45 +50,62 @@ rot_y = np.array([[0,0,1],[0,1,0],[-1,0,0]]) #camera x axis to right, drone x ax
 #criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
 #objp = np.zeros((6*7,3), np.float32)
 #objp[:,:2] = np.mgrid[0:7,0:6].T.reshape(-1,2)
-newCamMtx, _ = cv2.getOptimalNewCameraMatrix(camMat, distCoeffs, (1280,720), 1, (1280,720))
+#newCamMtx, _ = cv2.getOptimalNewCameraMatrix(camMat, distCoeffs, (1280,720), 1, (1280,720))
+
+#axis = np.float32([[3,0,0], [0,3,0], [0,0,-3]]).reshape(-1,3)
 
 # loop that runs the program forever
 # at least until the "q" key is pressed
 while True:
 
     # creates an "img" var that takes in a camera frame
-    ret, orig_img = camera.read()
+    ret, img = camera.read()
     if ret:
         # Convert to grayscale
-        #gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        img = cv2.undistort(orig_img, camMat, distCoeffs, None, newCamMtx)
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        #img = cv2.undistort(orig_img, camMat, distCoeffs, None, newCamMtx)
+
+        #tags = []
+        tags = at_detector.detect(gray, True, (9.7805583154190560e+02, 9.8040099676993566e+02, 6.4432270873931213e+02, 3.7751661754419627e+02), 0.2)
+        #print(tags)
+
+        for tag in tags:
+            #imgpts, jac = cv.projectPoints(axis, cv2.Rodrigues(tag.pose_R), tag.pose_t, camMat, distCoeffs)
+            cv2.drawFrameAxes(img, camMat, distCoeffs, cv2.Rodrigues(tag.pose_R)[0], tag.pose_t, 0.5)
+
+            heading_r_mtx = np.matmul(rot_y, tag.pose_R)
+            heading_r_mtx = heading_r_mtx.transpose()
+            r_mtx = tag.pose_R.transpose()
+            pos = np.matmul(r_mtx, np.negative(tag.pose_t))
+            r_quat = Quaternion(matrix=heading_r_mtx)
+            master.mav.att_pos_mocap_send(int(time.time()*1000000), (r_quat.w, r_quat.x, -r_quat.z, r_quat.y), pos[0], -pos[2], pos[1])
 
         # detect aruco tags within the frame
-        markerCorners, markerIds, rejectedCandidates = cv2.aruco.detectMarkers(img, dictionary, parameters=parameters)
+        #markerCorners, markerIds, rejectedCandidates = cv2.aruco.detectMarkers(img, dictionary, parameters=parameters)
 
         # draw box around aruco marker within camera frame
-        img = cv2.aruco.drawDetectedMarkers(img, markerCorners, markerIds)
+        #img = cv2.aruco.drawDetectedMarkers(img, markerCorners, markerIds)
 
         # if a tag is found...
-        if markerIds is not None:
-            now_ts = time.time()
-            if now_ts - last_send_ts > 0.03:
-                rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
-                cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
+        #if markerIds is not None:
+        #    now_ts = time.time()
+        #    if now_ts - last_send_ts > 0.03:
+        #        rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
+        #        cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
 
-                r_mtx = cv2.Rodrigues(rvecs[0][0])[0]
+        #        r_mtx = cv2.Rodrigues(rvecs[0][0])[0]
                 #print(rotationMatrixToEulerAngles(r_mtx[0]))
                 #print(r_mtx[0])
-                heading_r_mtx = np.matmul(rot_y, r_mtx)
-                heading_r_mtx = heading_r_mtx.transpose()
-                r_mtx = r_mtx.transpose()
-                pos = np.matmul(r_mtx, np.negative(tvecs[0][0]))
-                r_quat = Quaternion(matrix=heading_r_mtx)
-                master.mav.att_pos_mocap_send(int(now_ts*1000000), (r_quat.w, r_quat.x, -r_quat.z, r_quat.y), pos[0], -pos[2], pos[1])
-                last_send_ts = now_ts
+        #        heading_r_mtx = np.matmul(rot_y, r_mtx)
+        #        heading_r_mtx = heading_r_mtx.transpose()
+        #        r_mtx = r_mtx.transpose()
+        #        pos = np.matmul(r_mtx, np.negative(tvecs[0][0]))
+        #        r_quat = Quaternion(matrix=heading_r_mtx)
+        #        master.mav.att_pos_mocap_send(int(now_ts*1000000), (r_quat.w, r_quat.x, -r_quat.z, r_quat.y), pos[0], -pos[2], pos[1])
+        #        last_send_ts = now_ts
                 #print(markerIds[0], pos)
 
-                cv2.putText(img, ', '.join(map("{:0.2f}".format, pos)), (1, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 200), 2)
+        #        cv2.putText(img, ', '.join(map("{:0.2f}".format, pos)), (1, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 200), 2)
             #else:
             #    rvecs , tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(markerCorners, 0.2, camMat , distCoeffs)
             #    cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
@@ -124,7 +144,7 @@ while True:
         # Display the resulting frame
         cv2.imshow('image_display', img)
 
-        rec_vid.write(img)
+        #rec_vid.write(img)
 
     # handler to press the "q" key to exit the program
     usr_key = cv2.waitKey(1)
@@ -135,6 +155,7 @@ while True:
         master.mav.command_long_send(0, 0, 246, 0, 1, 0, 0, 0, 0, 0, 0) # reboot
     
     msg = master.recv_msg()
+    #msg = None
     if msg is not None:
         msg_type = msg.get_type()
         if msg_type == "STATUSTEXT":
@@ -150,5 +171,5 @@ while True:
 
 # When everything done, release the capture
 camera.release()
-rec_vid.release()
+#rec_vid.release()
 cv2.destroyAllWindows()
