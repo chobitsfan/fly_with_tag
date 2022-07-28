@@ -44,18 +44,24 @@ camMat = np.array([[9.7805583154190560e+02, 0, 6.4432270873931213e+02], [0, 9.80
 distCoeffs = np.array([1.5424037927595446e-01, -2.0723726675535267e-01, 6.2078491848616114e-04, 8.9082489283745796e-04, -2.1660065658513647e-01])
 rot_y = np.array([[0,0,1],[0,1,0],[-1,0,0]]) #camera x axis to right, drone x axis to forward
 
+#criteria = (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 30, 0.001)
+#objp = np.zeros((6*7,3), np.float32)
+#objp[:,:2] = np.mgrid[0:7,0:6].T.reshape(-1,2)
+newCamMtx, _ = cv2.getOptimalNewCameraMatrix(camMat, distCoeffs, (1280,720), 1, (1280,720))
+
 # loop that runs the program forever
 # at least until the "q" key is pressed
 while True:
 
     # creates an "img" var that takes in a camera frame
-    ret, img = camera.read()
+    ret, orig_img = camera.read()
     if ret:
         # Convert to grayscale
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        #gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cv2.undistort(orig_img, camMat, distCoeffs, None, newCamMtx)
 
         # detect aruco tags within the frame
-        markerCorners, markerIds, rejectedCandidates = cv2.aruco.detectMarkers(gray, dictionary, parameters=parameters)
+        markerCorners, markerIds, rejectedCandidates = cv2.aruco.detectMarkers(img, dictionary, parameters=parameters)
 
         # draw box around aruco marker within camera frame
         img = cv2.aruco.drawDetectedMarkers(img, markerCorners, markerIds)
@@ -107,6 +113,13 @@ while True:
                 #cv2.line(img, topRight, bottomRight, (0, 255, 0), 2)
                 #cv2.line(img, bottomRight, bottomLeft, (0, 255, 0), 2)
                 #cv2.line(img, bottomLeft, topLeft, (0, 255, 0), 2)
+
+        #ret, corners = cv2.findChessboardCorners(gray, (7,6),None)
+        #if ret:
+            #corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
+            # Find the rotation and translation vectors.
+            #ret, rvecs, tvecs = cv2.solvePnP(objp, corners2, camMat, distCoeffs)
+            #cv2.drawFrameAxes(img, camMat, distCoeffs, rvecs, tvecs, 0.5)
 
         # Display the resulting frame
         cv2.imshow('image_display', img)
