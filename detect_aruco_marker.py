@@ -29,7 +29,7 @@ cv2.namedWindow('image_display', cv2.WINDOW_AUTOSIZE)
 # Initialize the detector parameters using default values
 #parameters = cv2.aruco.DetectorParameters_create()
 
-at_detector = Detector(families='tag36h11', nthreads=2, quad_decimate=2.0, quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
+at_detector = Detector(families='tagStandard41h12', nthreads=2, quad_decimate=2.0, quad_sigma=0.0, refine_edges=1, decode_sharpening=0.25, debug=0)
 
 drone_ip='192.168.0.36'
 # initialize the webcam as "camera" object
@@ -41,6 +41,7 @@ rec_vid = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 30, (12
 
 master = mavutil.mavlink_connection(device='udpout:'+drone_ip+':17500', source_system=255)
 last_hb_send_ts = time.time()
+hb_mavlink2_ok = False
 #got_attitude = False
 
 #camMat = np.array([[978.05583, 0, 644.3227087], [0, 980.40099676, 377.5166175], [0, 0, 1]])
@@ -68,7 +69,7 @@ while True:
         #img = cv2.undistort(orig_img, camMat, distCoeffs, None, newCamMtx)
 
         #tags = []
-        tags = at_detector.detect(gray, True, (9.7805583154190560e+02, 9.8040099676993566e+02, 6.4432270873931213e+02, 3.7751661754419627e+02), 0.2)
+        tags = at_detector.detect(gray, True, (9.7805583154190560e+02, 9.8040099676993566e+02, 6.4432270873931213e+02, 3.7751661754419627e+02), 0.113)
         #print(tags)
 
         for tag in tags:
@@ -82,8 +83,8 @@ while True:
             # r_quat = Quaternion(matrix=heading_r_mtx)
             # master.mav.att_pos_mocap_send(int(time.time()*1000000), (r_quat.w, r_quat.x, -r_quat.z, r_quat.y), pos[0], -pos[2], pos[1])
 
-            #print(np.linalg.norm(tag.pose_t))
-            if master.mavlink20():
+            #print(tag.pose_t)
+            if hb_mavlink2_ok:
                 master.mav.landing_target_send(int(now_ts*1000000), 0, 0, 0, 0, np.linalg.norm(tag.pose_t), 0, 0, -tag.pose_t[1], tag.pose_t[0], tag.pose_t[2], (1, 0, 0, 0), 0, 1, )
 
         # detect aruco tags within the frame
@@ -175,7 +176,11 @@ while True:
         elif msg_type == "TIMESYNC":
             if msg.tc1 == 0: # ardupilot send a timesync message every 10 seconds
                 master.mav.system_time_send(int(now_ts * 1000000), 0) # ardupilot ignore time_boot_ms
-        #elif msg_type == "HEARTBEAT":
+        elif msg_type == "HEARTBEAT":
+            if master.mavlink20():
+                if not hb_mavlink2_ok:
+                    hb_mavlink2_ok = True
+                    print('mavlink 2 link ok')
             #print(master.mavlink20())
             #if not got_attitude:
                 #master.mav.command_long_send(0, 0, 511, 0, 30, 2000000, 0, 0, 0, 0, 0)
